@@ -1,17 +1,45 @@
 import streamlit as st
 from groq import Groq
+import pandas as pd
+from sklearn.pipeline import Pipeline
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.feature_extraction.text import TfidfVectorizer
 
-# Set page config
-st.set_page_config(page_title="Llama 3.3")
-
-# Load the api key
 api_key = st.secrets["API_KEY"]
 
-# Create an instance of groq client
-client = Groq(api_key = api_key)
+client = Groq(api_key=api_key)
+
+data = pd.read_csv("/workspaces/GROQ-llama3.1/nlp_intent_dataset.csv")
+X= data["User Query"]
+Y = data["Intent"]
+
+pipeline = Pipeline(
+    [("tfidf",TfidfVectorizer()),
+    ("clf",MultinomialNB())]
+)
+pipeline.fit(X,Y)
+
+# Intent Response Mapping
+responses = {
+    "Password_Reset": "To reset your password, go to settings and click 'Forgot Password'.",
+    "Check_Balance": "Your current account balance is $5000.",
+    "Order_Cancellation": "You can cancel your order from 'My Orders' section.",
+    "Order_Status": "Your order is being processed. Check your email for updates."
+}
+
+def predict_intent(userip):
+    return pipeline.predict([userip])[0]
+
+def chatbot_response(text):
+    intent = predict_intent(text)
+
+    if intent in responses:
+        return responses[intent]
+    else:
+        return llama_response(text)
 
 # Write a function to get response from the Groq client
-def model_response(text: str):
+def llama_response(text: str):
     stream = client.chat.completions.create(
         messages=[
             {
@@ -40,7 +68,7 @@ text = st.text_area("Please ask any question : ")
 
 if text:
     st.subheader("Model Response : ")
-    st.write_stream(model_response(text))
+    #st.write_stream(llama_response(text))
 
 # Get response from the chatbot (either predefined or AI-generated)
     response = chatbot_response(text)
